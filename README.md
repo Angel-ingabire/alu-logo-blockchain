@@ -1,57 +1,115 @@
-# Sample Hardhat 3 Project (`mocha` and `ethers`)
+# ALU Logo Blockchain Project
 
-This project showcases a Hardhat 3 project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+## 1. Project Overview
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+This project demonstrates how blockchain technology can be used to register, authenticate, and tokenize the African Leadership University (ALU) logo using Solidity smart contracts.
 
-## Project Overview
+The project uses a local Hardhat blockchain for development and testing. It contains two smart contracts:
 
-This example project includes:
+- **ALUAssetRegistry (ERC-721):** Registers the ALU logo as a non-fungible token (NFT), stores its metadata and SHA-256 content hash, prevents duplicate hash registrations, and verifies logo integrity.
+- **ALULogoToken (ERC-20):** Creates a fixed supply of 1,000,000 ALU Logo Tokens (ALUT), allows the owner to distribute tokens, and calculates token ownership percentages.
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+## 2. Logo Integrity
 
-## Usage
+The project uses SHA-256 to calculate a hash of the original `alu-logo.png` file.
 
-### Running Tests
+**SHA-256 hash:**
 
-To run all the tests in the project, execute the following command:
+`407BE7B9AC994BCCA2AB5E0C901B6471A149AA08FC9201F7BF546E6852FB9DDE`
 
-```shell
+The hash is stored as a `bytes32` value in the asset registry. During verification, the supplied hash is compared with the registered hash to determine whether the logo matches the registered file.
+
+## 3. Technologies Used
+
+- Solidity 0.8.34
+- Hardhat 3
+- Ethers.js 6
+- OpenZeppelin Contracts 5.6.1
+- JavaScript (ES modules)
+- Mocha and Chai
+- Node.js 22
+
+## 4. Project Structure
+
+```text
+alu-logo-blockchain/
+├── contracts/
+│   ├── ALUAssetRegistry.sol
+│   ├── ALULogoToken.sol
+│   ├── Counter.sol
+│   └── Counter.t.sol
+├── scripts/
+│   └── deploy.js
+├── test/
+│   ├── ALUAssetRegistry.test.js
+│   └── Counter.ts
+├── alu-logo.png
+├── hardhat.config.ts
+├── package.json
+├── package-lock.json
+└── README.md
+```
+
+## 5. Installation
+
+Install Node.js and npm, then clone or download the project.
+
+Install the project dependencies:
+
+```bash
+npm install
+```
+
+## 6. Compile the Smart Contracts
+
+From the project root, run:
+
+```bash
+npx hardhat compile
+```
+
+## 7. Run the Tests
+
+Execute the automated tests with:
+
+```bash
 npx hardhat test
 ```
 
-You can also selectively run the Solidity or `mocha` tests:
+The tests cover NFT registration, duplicate hash rejection, correct and incorrect logo verification, metadata retrieval, token supply, token distribution, and ownership percentage calculations.
 
-```shell
-npx hardhat test solidity
-npx hardhat test mocha
+The project currently passes all 10 Mocha tests, including the two default Counter tests. Three additional Solidity tests also pass, giving 13 passing tests overall.
+
+## 8. Deploy Locally
+
+Run the deployment script against the local simulated blockchain:
+
+```bash
+npx hardhat run ./scripts/deploy.js --network hardhatMainnet
 ```
 
-### Make a deployment to Sepolia
+The script deploys both contracts and registers the ALU logo. The local deployment does not require real ETH.
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
+## 9. Development Challenges and Solutions
 
-To run the deployment to a local chain:
+### Hash representation
 
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
-```
+The SHA-256 hash was generated from the original logo file. Solidity and Ethers.js displayed the hexadecimal hash in lowercase, while the original hash output used uppercase letters. The test comparison was updated to normalize the letter case.
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
+### Duplicate registration
 
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
+A mapping records whether a content hash has already been registered. The contract rejects attempts to register the same hash again.
 
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
+### Automated testing
 
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-```
+Automated tests were created to verify both contracts' expected behavior, including successful registration, integrity verification, token distribution, and ownership percentage calculations.
 
-After setting the variable, you can run the deployment with the Sepolia network:
+## 10. Conclusion
 
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
-```
+This project demonstrates how smart contracts can support digital asset registration, integrity verification, and token-based ownership representation. The local deployment and passing automated tests provide evidence that the core functionality works in a simulated blockchain environment.
+
+**Deployment status:** Local Hardhat deployment successful.
+
+**Public repository:** Add the GitHub repository URL here after publishing the project.
+
+**Demonstration video:** Add the video URL here when available.
