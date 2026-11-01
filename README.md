@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-This project demonstrates how blockchain technology can be used to register, authenticate, and tokenize the African Leadership University (ALU) logo using Solidity smart contracts.
+This project demonstrates how blockchain technology can be used to register, authenticate, and tokenize the African Leadership University (ALU) logo using Solidity smart contracts. The ERC-721 `ALUAssetRegistry` records the logo's metadata and SHA-256 fingerprint as a unique NFT, while the ERC-20 `ALULogoToken` issues fungible ALUT tokens and demonstrates owner-controlled distribution. The token model is educational and does not grant legal ownership or rights to the ALU logo.
 
 The project uses a local Hardhat blockchain for development and testing. It contains two smart contracts:
 
@@ -22,7 +22,7 @@ The hash is stored as a `bytes32` value in the asset registry. During verificati
 ## 3. Technologies Used
 
 - Solidity 0.8.34
-- Hardhat 3
+- Hardhat 3.21.0
 - Ethers.js 6
 - OpenZeppelin Contracts 5.6.1
 - JavaScript (ES modules)
@@ -78,7 +78,13 @@ npx hardhat test
 
 The tests cover NFT registration, duplicate hash rejection, correct and incorrect logo verification, metadata retrieval, token supply, token distribution, and ownership percentage calculations.
 
-The project currently passes all 10 Mocha tests, including the two default Counter tests. Three additional Solidity tests also pass, giving 13 passing tests overall.
+The project has eight assignment-specific Mocha tests. Run them alone with:
+
+```bash
+npx hardhat test mocha test/ALUAssetRegistry.test.js
+```
+
+The project currently passes all eight assignment-specific tests. The full test suite also runs the Counter sample tests, giving 13 passing tests overall (10 Mocha and 3 Solidity tests).
 
 ## 8. Deploy Locally
 
@@ -110,6 +116,4 @@ This project demonstrates how smart contracts can support digital asset registra
 
 **Deployment status:** Local Hardhat deployment successful.
 
-**Public repository:** Add the GitHub repository URL here after publishing the project.
-
-**Demonstration video:** Add the video URL here when available.
+**Public repository:** https://github.com/Angel-ingabire/alu-logo-blockchain
