@@ -31,10 +31,28 @@ Deploy the contracts:
 npx hardhat run ./scripts/deploy.js --network localhost
 ```
 
-The deployment writes the live contract addresses to the frontend configuration file. The current deployed addresses are:
+The deployment writes the live contract addresses to the frontend configuration file. The current local deployed addresses are:
 
 - `ALUAssetRegistry`: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
 - `ALULogoToken`: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
+
+## Sepolia setup (not deployed by default)
+
+Before a Sepolia deployment, create a local `.env` file from the template:
+
+```bash
+cp .env.example .env
+```
+
+Then populate the required values:
+
+- `SEPOLIA_PRIVATE_KEY`: a local-only private key for the Sepolia deployment wallet
+- `SEPOLIA_RPC_URL`: Ethereum Sepolia RPC URL
+- `EXPECTED_OWNER_ADDRESS`: the required owner address for the deployment wallet
+- `VITE_NETWORK`: set to `local` or `sepolia`
+- `VITE_SEPOLIA_ALU_ASSET_REGISTRY` and `VITE_SEPOLIA_ALU_LOGO_TOKEN`: set only after a real deployment
+
+The project intentionally does not deploy to Sepolia automatically. The deployment script validates that the signer derived from `SEPOLIA_PRIVATE_KEY` matches the expected owner address, enforces Sepolia chain ID `11155111`, and writes deployment metadata only after a successful real deployment. It never prints the private key or commits `.env` files.
 
 ## Run the dApp
 
@@ -99,23 +117,33 @@ The current suite passes successfully, including the ALU asset registry and toke
 │   ├── ALULogoToken.sol
 │   ├── Counter.sol
 │   └── Counter.t.sol
-├── src/
-│   ├── App.jsx
-│   ├── main.jsx
-│   ├── index.css
-│   ├── blockchain/
-│   │   ├── config.js
-│   │   └── contracts.js
-│   └── lib/
-│       └── utils.js
+├── frontend/
+│   ├── src/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── vitest.setup.js
 ├── scripts/
 │   └── deploy.js
 ├── test/
-│   └── ALUAssetRegistry.test.js
+│   ├── ALUAssetRegistry.test.js
+│   └── frontend-hashing.test.js
 ├── hardhat.config.ts
 ├── package.json
-├── vite.config.js
-├── index.html
 ├── README.md
+├── Project_Report.pdf
+├── .env.example
+├── alu-logo.png
+├── alu-logo-hash.png
 └── ...
 ```
+
+## Deliverables and user-supplied assets
+
+This repository includes the implementation, contract tests, frontend app, and a draft report. The final assignment submission may still require the user to supply:
+
+- Screenshot(s) of the deployed or local app
+- GitHub repository URL or project link
+- Demonstration video link or recording reference
+
+These items are purposely not fabricated here; they must be supplied by the user before the final submission package is completed.

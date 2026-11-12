@@ -21,6 +21,9 @@
 .env.*
 !.env.example
 
+# Deployment metadata generated only after a real deployment
+/deployments/
+
 # Hardhat coverage reports
 /coverage
 
@@ -29,3 +32,13 @@
 
 # Snapshot cheatcodes output
 /snapshots
+# Dependencies (root and frontend)
+node_modules/
+**/node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# Local frontend environment variables
+frontend/.env.local
+frontend/.env.*.local

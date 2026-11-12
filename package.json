@@ -6,9 +6,11 @@
     "test": "npx hardhat test",
     "compile": "npx hardhat compile",
     "deploy": "npx hardhat run ./scripts/deploy.js --network localhost",
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "dev": "npm --prefix frontend run dev -- --host 0.0.0.0",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview -- --host 0.0.0.0",
+    "frontend:test": "npm --prefix frontend test",
+    "frontend:dev": "npm --prefix frontend run dev -- --host 0.0.0.0"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +27,7 @@
     "@types/node": "^22.20.5",
     "@vitejs/plugin-react": "^6.2.1",
     "chai": "^6.3.0",
+    "dotenv": "^18.0.10",
     "ethers": "^6.17.0",
     "forge-std": "github:foundry-rs/forge-std#v1.16.2",
     "hardhat": "^3.21.0",

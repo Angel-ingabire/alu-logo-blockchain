@@ -10,13 +10,14 @@ export function normalizeHash(hash) {
   }
 
   const raw = hash.trim();
-  const value = raw.startsWith("0x") ? raw.slice(2) : raw;
+  const lowered = raw.toLowerCase();
+  const value = lowered.startsWith("0x") ? lowered.slice(2) : lowered;
 
-  if (!/^[0-9a-fA-F]+$/.test(value) || value.length !== 64) {
+  if (!/^[0-9a-f]+$/.test(value) || value.length !== 64) {
     throw new Error("The hash must be exactly 32 bytes long (64 hexadecimal characters).");
   }
 
-  return `0x${value.toLowerCase()}`;
+  return `0x${value}`;
 }
 
 export async function computeFileHash(file) {

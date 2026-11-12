@@ -16,7 +16,7 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
-import { LOCAL_NETWORK } from "./blockchain/config";
+import { ACTIVE_NETWORK, getNetworkConfig } from "./blockchain/config";
 import { getRegistryContract, getTokenContract } from "./blockchain/contracts";
 import { computeFileHash, formatAddress, formatDate, normalizeHash } from "./lib/utils";
 
@@ -28,7 +28,7 @@ const navItems = [
   "Documentation",
 ];
 
-const unsupportedNetworkMessage = `Unsupported network. Please switch MetaMask to ${LOCAL_NETWORK.name} (Chain ID ${LOCAL_NETWORK.chainId}).`;
+const unsupportedNetworkMessage = `Unsupported network. Please switch MetaMask to ${ACTIVE_NETWORK.name} (Chain ID ${ACTIVE_NETWORK.chainId}).`;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -135,7 +135,7 @@ export default function App() {
       setWalletAddress(address);
       setNetworkName(network.name || "Unknown network");
 
-      if (chainId !== LOCAL_NETWORK.chainId) {
+      if (chainId !== ACTIVE_NETWORK.chainId) {
         setConnectionError(unsupportedNetworkMessage);
       } else {
         setConnectionError("");
@@ -264,7 +264,7 @@ export default function App() {
       setIsVerifying(true);
       setVerifyResult(null);
 
-      const provider = new JsonRpcProvider(LOCAL_NETWORK.rpcUrl);
+      const provider = new JsonRpcProvider(getNetworkConfig(ACTIVE_NETWORK.chainId).rpcUrl);
       const registry = getRegistryContract(provider);
       const normalizedHash = normalizeHash(verifyHash || generatedHash);
       const tokenId = BigInt(verifyTokenId || 1);
@@ -420,10 +420,10 @@ export default function App() {
 
             <div className="mt-6 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
               <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Local network</p>
-              <p className="mt-2">{LOCAL_NETWORK.name}</p>
-              <p>RPC: {LOCAL_NETWORK.rpcUrl}</p>
-              <p>Chain ID: {LOCAL_NETWORK.chainId}</p>
-              <p>Currency: {LOCAL_NETWORK.currency}</p>
+              <p className="mt-2">{ACTIVE_NETWORK.name}</p>
+              <p>RPC: {ACTIVE_NETWORK.rpcUrl}</p>
+              <p>Chain ID: {ACTIVE_NETWORK.chainId}</p>
+              <p>Currency: {ACTIVE_NETWORK.currency}</p>
             </div>
           </aside>
 
@@ -826,7 +826,7 @@ export default function App() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h3 className="text-xl font-bold">Add the local Hardhat network to MetaMask</h3>
                   <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                    <li>Network: Hardhat Local</li>
+                    <li>Network: {ACTIVE_NETWORK.name}</li>
                     <li>RPC URL: http://127.0.0.1:8545</li>
                     <li>Chain ID: 31337</li>
                     <li>Currency Symbol: ETH</li>
