@@ -1,119 +1,121 @@
-# ALU Logo Blockchain Project
+# ALU Asset Registry dApp
 
-## 1. Project Overview
+This project combines the original Hardhat smart contracts with a modern web front end for the African Leadership University (ALU). The application connects to the deployed `ALUAssetRegistry` and `ALULogoToken` contracts, allowing users to connect a wallet, register assets, verify the ALU logo, and track token ownership without using terminal commands.
 
-This project demonstrates how blockchain technology can be used to register, authenticate, and tokenize the African Leadership University (ALU) logo using Solidity smart contracts. The ERC-721 `ALUAssetRegistry` records the logo's metadata and SHA-256 fingerprint as a unique NFT, while the ERC-20 `ALULogoToken` issues fungible ALUT tokens and demonstrates owner-controlled distribution. The token model is educational and does not grant legal ownership or rights to the ALU logo.
-
-The project uses a local Hardhat blockchain for development and testing. It contains two smart contracts:
-
-- **ALUAssetRegistry (ERC-721):** Registers the ALU logo as a non-fungible token (NFT), stores its metadata and SHA-256 content hash, prevents duplicate hash registrations, and verifies logo integrity.
-- **ALULogoToken (ERC-20):** Creates a fixed supply of 1,000,000 ALU Logo Tokens (ALUT), allows the owner to distribute tokens, and calculates token ownership percentages.
-
-## 2. Logo Integrity
-
-The project uses SHA-256 to calculate a hash of the original `alu-logo.png` file.
-
-**SHA-256 hash:**
-
-`407BE7B9AC994BCCA2AB5E0C901B6471A149AA08FC9201F7BF546E6852FB9DDE`
-
-The hash is stored as a `bytes32` value in the asset registry. During verification, the supplied hash is compared with the registered hash to determine whether the logo matches the registered file.
-
-## 3. Technologies Used
+## Stack
 
 - Solidity 0.8.34
 - Hardhat 3.21.0
 - Ethers.js 6
+- React + Vite
+- Tailwind CSS
 - OpenZeppelin Contracts 5.6.1
-- JavaScript (ES modules)
-- Mocha and Chai
-- Node.js 22
+- MetaMask wallet integration
 
-## 4. Project Structure
+## Smart contracts
 
-```text
-alu-logo-blockchain/
-├── contracts/
-│   ├── ALUAssetRegistry.sol
-│   ├── ALULogoToken.sol
-│   ├── Counter.sol
-│   └── Counter.t.sol
-├── scripts/
-│   └── deploy.js
-├── test/
-│   ├── ALUAssetRegistry.test.js
-│   └── Counter.ts
-├── alu-logo.png
-├── hardhat.config.ts
-├── package.json
-├── package-lock.json
-└── README.md
+- `ALUAssetRegistry.sol`: ERC-721 registry for the ALU logo. Stores metadata, a SHA-256 `bytes32` hash, prevents duplicate registrations, and validates integrity with `verifyLogoIntegrity()`.
+- `ALULogoToken.sol`: ERC-20 token with a fixed max supply of 1,000,000 ALUT. The owner can distribute tokens and each wallet can check its percentage ownership.
+
+## Local deployment
+
+Start the local Hardhat blockchain:
+
+```bash
+npx hardhat node --hostname 127.0.0.1
 ```
 
-## 5. Installation
+Deploy the contracts:
 
-Install Node.js and npm, then clone or download the project.
+```bash
+npx hardhat run ./scripts/deploy.js --network localhost
+```
 
-Install the project dependencies:
+The deployment writes the live contract addresses to the frontend configuration file. The current deployed addresses are:
+
+- `ALUAssetRegistry`: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+- `ALULogoToken`: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
+
+## Run the dApp
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-## 6. Compile the Smart Contracts
-
-From the project root, run:
+Start the dev server:
 
 ```bash
-npx hardhat compile
+npm run dev -- --host 0.0.0.0
 ```
 
-## 7. Run the Tests
+Open the local Vite URL in the browser, usually:
 
-Execute the automated tests with:
+```text
+http://localhost:5173/
+```
+
+## Features
+
+- Wallet connection using MetaMask
+- Display of connected wallet address and ALUT balance
+- Local network detection and network guidance
+- Browser-side SHA-256 hash generation from uploaded image files
+- Asset registration using `registerAsset()`
+- Public logo verification using `verifyLogoIntegrity()`
+- ALUT ownership dashboard and owner-only distribution form
+- Documentation on ABI usage, read-only calls, transaction signing, and local Hardhat setup
+
+## Network configuration for MetaMask
+
+- Network name: Hardhat Local
+- RPC URL: http://127.0.0.1:8545
+- Chain ID: 31337
+- Currency: ETH
+
+## Verification and tests
+
+Run Hardhat contract tests:
 
 ```bash
 npx hardhat test
 ```
 
-The tests cover NFT registration, duplicate hash rejection, correct and incorrect logo verification, metadata retrieval, token supply, token distribution, and ownership percentage calculations.
-
-The project has eight assignment-specific Mocha tests. Run them alone with:
+Build the production frontend:
 
 ```bash
-npx hardhat test mocha test/ALUAssetRegistry.test.js
+npm run build
 ```
 
-The project currently passes all eight assignment-specific tests. The full test suite also runs the Counter sample tests, giving 13 passing tests overall (10 Mocha and 3 Solidity tests).
+The current suite passes successfully, including the ALU asset registry and token distribution tests.
 
-## 8. Deploy Locally
+## Project structure
 
-Run the deployment script against the local simulated blockchain:
-
-```bash
-npx hardhat run ./scripts/deploy.js --network hardhatMainnet
+```text
+.
+├── contracts/
+│   ├── ALUAssetRegistry.sol
+│   ├── ALULogoToken.sol
+│   ├── Counter.sol
+│   └── Counter.t.sol
+├── src/
+│   ├── App.jsx
+│   ├── main.jsx
+│   ├── index.css
+│   ├── blockchain/
+│   │   ├── config.js
+│   │   └── contracts.js
+│   └── lib/
+│       └── utils.js
+├── scripts/
+│   └── deploy.js
+├── test/
+│   └── ALUAssetRegistry.test.js
+├── hardhat.config.ts
+├── package.json
+├── vite.config.js
+├── index.html
+├── README.md
+└── ...
 ```
-
-The script deploys both contracts and registers the ALU logo. The local deployment does not require real ETH.
-
-## 9. Development Challenges and Solutions
-
-### Hash representation
-
-The SHA-256 hash was generated from the original logo file. Solidity and Ethers.js displayed the hexadecimal hash in lowercase, while the original hash output used uppercase letters. The test comparison was updated to normalize the letter case.
-
-### Duplicate registration
-
-A mapping records whether a content hash has already been registered. The contract rejects attempts to register the same hash again.
-
-### Automated testing
-
-Automated tests were created to verify both contracts' expected behavior, including successful registration, integrity verification, token distribution, and ownership percentage calculations.
-
-## 10. Conclusion
-
-This project demonstrates how smart contracts can support digital asset registration, integrity verification, and token-based ownership representation. The local deployment and passing automated tests provide evidence that the core functionality works in a simulated blockchain environment.
-
-**Deployment status:** Local Hardhat deployment successful.
-
-**Public repository:** https://github.com/Angel-ingabire/alu-logo-blockchain
