@@ -22,13 +22,3 @@ main().catch((error) => {
   console.error("Read-only Sepolia diagnostic failed:", error.message);
   process.exitCode = 1;
 });
-# Dependencies(root and frontend)
-node_modules /
-** /node_modules/
-
-# Frontend build output
-frontend / dist /
-
-# Local frontend environment variables
-frontend /.env.local
-frontend /.env.*.local
