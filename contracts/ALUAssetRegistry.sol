@@ -40,8 +40,6 @@ contract ALUAssetRegistry is ERC721 {
         tokenId = nextTokenId;
         nextTokenId++;
 
-        _safeMint(msg.sender, tokenId);
-
         assets[tokenId] = AssetMetadata({
             assetName: assetName,
             fileType: fileType,
@@ -49,8 +47,9 @@ contract ALUAssetRegistry is ERC721 {
             registeredBy: msg.sender,
             registeredAt: block.timestamp
         });
-
         registeredHashes[contentHash] = true;
+
+        _safeMint(msg.sender, tokenId);
 
         emit AssetRegistered(
             tokenId,

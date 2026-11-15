@@ -235,8 +235,8 @@ The project was validated with:
 ```bash
 git clone https://github.com/Angel-ingabire/alu-logo-blockchain.git
 cd alu-logo-blockchain
-npm install
-npm install --prefix frontend
+npm ci
+npm --prefix frontend ci
 ```
 
 ### Configuration
@@ -251,9 +251,13 @@ SEPOLIA_PRIVATE_KEY=0x...
 EXPECTED_OWNER_ADDRESS=0x55D23cA45Eace7E4497C780f89eac62f61421B3E
 ```
 
-The frontend uses public Vite variables in `frontend/.env.local`.
+The frontend uses public Vite variables in `frontend/.env.local`. Start from the committed `frontend/.env.example` template:
 
-There is no committed `frontend/.env.example` file in this repository. The project instead relies on an ignored local file named `frontend/.env.local`.
+```bash
+Copy-Item frontend/.env.example frontend/.env.local
+```
+
+The template selects Sepolia and contains the existing deployment addresses and a public RPC endpoint. The app also safely falls back to those recorded Sepolia defaults when a setting is absent, blank, or a placeholder. A custom RPC endpoint or contract address can be supplied through the same variables.
 
 Example public frontend settings:
 
@@ -262,25 +266,30 @@ VITE_NETWORK=sepolia
 VITE_SEPOLIA_RPC_URL=https://...
 VITE_SEPOLIA_ALU_ASSET_REGISTRY=0x93B4124B9673f520457577819B525E40abEc8F57
 VITE_SEPOLIA_ALU_LOGO_TOKEN=0xc83E78175eD2c5f07Dcc8143D153cbB181d57730
+VITE_SEPOLIA_TOKEN_HOLDER_ADDRESSES=
 ```
 
-Important: Vite variables are exposed to the browser. Do not place private keys, seed phrases, or other secrets in any `VITE_` variable. Keep all sensitive values in the ignored root `.env` file.
+The token dashboard can show example holder rows when `VITE_SEPOLIA_TOKEN_HOLDER_ADDRESSES` contains at least three comma-separated, verified Sepolia addresses. It reads each configured address's current balance from the token contract; it does not scan Transfer history or supply default/example addresses. Leave this setting blank until verified holder addresses are available.
+
+Important: Vite variables are exposed to the browser. Do not place private keys, seed phrases, or other secrets in any `VITE_` variable. The root `.env.example` is only for deployment configuration; keep any real deployment credentials in the ignored root `.env` file.
 
 ### Local development commands
 
-From the repository root:
+From the repository root (the frontend commands compile the contracts first so generated ABI artifacts are current):
 
 ```bash
-npx hardhat compile
-npx hardhat test
+npm run compile
+npm test
+npm run test:all
 npm run dev
+npm run build
 ```
 
-From the frontend folder:
+`npm run test:all` runs the Hardhat suite and then the frontend Vitest suite. To run frontend commands directly:
 
 ```bash
-cd frontend
-npm run dev
+npm --prefix frontend test
+npm --prefix frontend run build
 ```
 
 The dev server runs at:
@@ -292,7 +301,6 @@ http://localhost:5173/
 ### Production build
 
 ```bash
-cd frontend
 npm run build
 ```
 
@@ -300,74 +308,53 @@ npm run build
 
 The repository contains both Solidity tests and frontend browser tests.
 
-### Solidity tests
+### Solidity and Hardhat tests
 
-The Hardhat suite currently includes:
+The Hardhat suite includes `contracts/Counter.t.sol`, `test/ALUAssetRegistry.test.js`, and `test/frontend-hashing.test.js`.
 
-- `contracts/Counter.t.sol`
-- `test/ALUAssetRegistry.test.js`
-
-Verified command:
+Run from the repository root:
 
 ```bash
-cd "C:\Users\HP\Documents\Individual-Assignment-2--DApp-Integration-with-Smart-Contract"
-npx hardhat test
+npm test
 ```
 
-Verified result:
-
-- 15 passing tests total
-- 3 Solidity tests in the Counter suite passed
-- 15 Mocha tests passed
-
-That includes the original ALU registry and token tests plus the extra Counter and frontend hashing helper tests that are present in the project.
+Verified result: 25 tests passed, including 3 Solidity tests and 22 Mocha tests.
 
 ### Frontend tests
 
-The frontend test suite is in `frontend/src/App.test.jsx` and uses mocked browser/provider/token/registry objects.
+The frontend suite includes `frontend/src/App.test.jsx` and `frontend/src/blockchain/config.test.js`. The app tests use mocked browser/provider/token/registry objects; configuration tests cover the Sepolia defaults, environment overrides, and invalid RPC URL handling.
 
-Verified command:
+Run from the repository root:
 
 ```bash
-cd "C:\Users\HP\Documents\Individual-Assignment-2--DApp-Integration-with-Smart-Contract\frontend"
-npx vitest run --environment jsdom src/App.test.jsx
+npm run frontend:test
 ```
 
-Verified result:
+Verified result: 2 test files passed, with 24 tests passed and 0 failed.
 
-- 1 test file passed
-- 8 tests passed
-- 0 failed
+The 20 mocked app tests cover:
 
-This verifies the mock UI flows for:
+- wallet balance, supply, ownership, decimals, and configured example-holder display,
+- missing, invalid, and duplicate example-holder configuration,
+- wallet disconnect and network-change data clearing,
+- browser file hashing and public logo verification,
+- token distribution and invalid-input handling.
 
-- wallet balance display,
-- file hashing,
-- verification success path,
-- verification failure path,
-- token distribution,
-- invalid recipient validation,
-- invalid amount validation,
-- over-balance restriction.
-
-Important caveat: the frontend tests are mocked, not live Sepolia integration tests. They do not demonstrate a real wallet connection to Ethereum Sepolia or a real deployed contract read.
+Important caveat: the UI tests are mocked, not live Sepolia integration tests. They do not demonstrate a real wallet connection to Ethereum Sepolia or a real deployed contract read.
 
 ## Known limitations and honest status
 
 The project is functional for local mock validation and for read-only contract interaction when the correct Sepolia configuration is supplied. However, there are some genuine limitations:
 
-- A full historical holder scan is not guaranteed to work with provider log limits.
-- The app intentionally avoids scanning from block zero when no verified deployment block is available.
-- The complete historical holder list is therefore unavailable when the deployment block is not known, and the app should not claim a complete leaderboard in that case.
+- The dashboard intentionally does not scan historical `Transfer` events and does not claim to show a complete holder list.
+- No verified example holder addresses are currently configured. The dashboard will show example rows only after at least three addresses are configured in `VITE_SEPOLIA_TOKEN_HOLDER_ADDRESSES`; it reads their live balances and calculates ownership from those balances and `totalSupply()`.
 - The frontend tests are mock-based and do not assert real-chain wallet behavior.
 - The project does not include a live browser screenshot or demo video in the repository.
 - The deployment metadata is ignored by Git, so public deployment URLs and addresses must be recorded in the README or submission materials.
 
-## Important note on historical holder event retrieval
+## Token dashboard example holders
 
-The token dashboard previously attempted to fetch all historical `Transfer` logs from the earliest block to the latest block in a single `eth_getLogs` request. That is not safe for Sepolia when the block range is too large. The safe approach is to fetch logs in smaller chunks, typically no more than 10,000 blocks per request, and only start from a verified deployment block when one is known.
-
-If no verified deployment block is available, the app must not silently invent a starting block or scan from block zero. Instead, it should keep direct read methods such as `balanceOf()`, `totalSupply()`, `owner()`, and `ownershipPercentage()` working, while clearly reporting that the complete historical holder list is unavailable.
+The dashboard uses only manually configured, verified Sepolia addresses for its example rows. It reads each current balance with `balanceOf()` and derives the percentage from that balance and `totalSupply()`. It does not retrieve historical `Transfer` logs, infer a deployment block, or present the examples as a complete holder list. The environment variable is intentionally blank in the committed template until verified addresses are available.
 
 ## Submission guidance
 
@@ -395,6 +382,8 @@ Do not commit or submit:
 - Smart contracts, architecture, and network flow are described.
 - Sepolia addresses and chain information are documented.
 - The actual deployment metadata and expected hash are included.
+- Frontend environment configuration has a committed `.env.example` template.
+- Dashboard example-holder configuration is explicit and does not fabricate addresses or balances.
 - Setup and installation commands are included.
 - Dependency and tool versions are documented.
 - Test commands and actual results are included.
@@ -403,13 +392,12 @@ Do not commit or submit:
 ### Missing or unverifiable information
 
 - There is no submitted demonstration video or screenshot in the repo.
-- No frontend `.env.example` file exists; the app expects a local `frontend/.env.local` file.
-- The application does not currently record a verified historical deployment block for `ALULogoToken` in project metadata, so a full historical holder scan must be treated as unavailable unless a verified block is supplied.
+- Three verified Sepolia example-holder addresses are not currently available in project configuration; the dashboard requires them before it can display three example rows.
 
 ### Requirements the project does not yet fully satisfy
 
 - Full live browser-to-Sepolia verification of every wallet action has not been captured in a persistent project artifact.
-- A complete historical holder leaderboard is not available when no verified deployment block is known.
+- A complete historical holder leaderboard is not provided; the dashboard displays only explicitly configured examples.
 - A screenshot or demonstration video for submission is still required.
 
 This README is intended to be a technical and submission-ready summary based on the actual project files, current test results, and the project’s real deployment metadata.

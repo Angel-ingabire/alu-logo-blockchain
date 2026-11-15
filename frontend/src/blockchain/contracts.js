@@ -1,9 +1,9 @@
 import { Contract } from "ethers";
 import { ASSET_REGISTRY_ABI, LOGO_TOKEN_ABI, getContractAddress } from "./config";
 
-export function getRegistryContract(signerOrProvider) {
+export function getRegistryContract(signerOrProvider, chainId) {
   return new Contract(
-    getContractAddress("ALUAssetRegistry"),
+    getContractAddress("ALUAssetRegistry", chainId),
     ASSET_REGISTRY_ABI,
     signerOrProvider
   );

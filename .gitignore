@@ -1,44 +1,32 @@
-# Node modules
-/node_modules
-
-# Compilation output
-/dist
-
-# pnpm deploy output
-/bundle
-
-# Hardhat Build Artifacts
-/artifacts
-
-# Hardhat compilation (v2) support directory
-/cache
-
-# Typechain output
-/types
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Deployment metadata generated only after a real deployment
-/deployments/
-
-# Hardhat coverage reports
-/coverage
-
-# Gas snapshot files
-/.gas-snapshot
-
-# Snapshot cheatcodes output
-/snapshots
-# Dependencies (root and frontend)
+# Dependencies
 node_modules/
 **/node_modules/
 
-# Frontend build output
-frontend/dist/
+# Generated build and test output
+dist/
+**/dist/
+artifacts/
+**/artifacts/
+cache/
+**/cache/
+types/
+coverage/
+**/coverage/
+bundle/
+.vite/
 
-# Local frontend environment variables
-frontend/.env.local
-frontend/.env.*.local
+# Environment files (keep the non-secret templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local deployment metadata and snapshots
+/deployments/
+/.gas-snapshot
+/snapshots/
+
+# Logs and local OS metadata
+*.log
+.DS_Store
+Thumbs.db

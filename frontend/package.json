@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "npm --prefix .. run compile",
     "dev": "vite --host 0.0.0.0",
+    "prebuild": "npm --prefix .. run compile",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "pretest": "npm --prefix .. run compile",
     "test": "vitest --run --environment jsdom"
   },
   "dependencies": {

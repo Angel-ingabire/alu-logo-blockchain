@@ -4,6 +4,50 @@ import logoTokenArtifact from "../../../artifacts/contracts/ALULogoToken.sol/ALU
 export const ASSET_REGISTRY_ABI = assetRegistryArtifact.abi;
 export const LOGO_TOKEN_ABI = logoTokenArtifact.abi;
 
+const DEFAULT_SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+const DEFAULT_SEPOLIA_ADDRESSES = {
+  ALUAssetRegistry: "0x93B4124B9673f520457577819B525E40abEc8F57",
+  ALULogoToken: "0xc83E78175eD2c5f07Dcc8143D153cbB181d57730",
+};
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+function isPlaceholder(value) {
+  return !value || /example|placeholder|your[_-]?|\.{3}/i.test(value.trim());
+}
+
+function getSepoliaRpcUrl() {
+  const configuredUrl = import.meta.env.VITE_SEPOLIA_RPC_URL?.trim();
+  if (isPlaceholder(configuredUrl)) {
+    return DEFAULT_SEPOLIA_RPC_URL;
+  }
+
+  let url;
+  try {
+    url = new URL(configuredUrl);
+  } catch {
+    throw new Error("VITE_SEPOLIA_RPC_URL must be a valid public HTTP or HTTPS URL.");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("VITE_SEPOLIA_RPC_URL must use HTTP or HTTPS.");
+  }
+
+  return configuredUrl;
+}
+
+function getSepoliaAddress(name, variableName, environmentValue) {
+  const configuredAddress = environmentValue?.trim();
+  if (isPlaceholder(configuredAddress) || configuredAddress?.toLowerCase() === ZERO_ADDRESS.toLowerCase()) {
+    return DEFAULT_SEPOLIA_ADDRESSES[name];
+  }
+
+  if (!/^0x[0-9a-fA-F]{40}$/.test(configuredAddress)) {
+    throw new Error(`${variableName} must be a valid Ethereum address.`);
+  }
+
+  return configuredAddress;
+}
+
 export const LOCAL_NETWORK = {
   chainId: 31337,
   name: "Hardhat Local",
@@ -16,34 +60,19 @@ function getSelectedNetworkName() {
   return networkName === "sepolia" || networkName === "local" ? networkName : "local";
 }
 
-function requireSepoliaFrontendConfig() {
-  const selectedNetwork = getSelectedNetworkName();
-
-  if (selectedNetwork !== "sepolia") {
-    return;
-  }
-
-  const missingKeys = [
-    "VITE_SEPOLIA_RPC_URL",
-    "VITE_SEPOLIA_ALU_ASSET_REGISTRY",
-    "VITE_SEPOLIA_ALU_LOGO_TOKEN",
-  ].filter((key) => !import.meta.env[key]);
-
-  if (missingKeys.length > 0) {
-    throw new Error(
-      `Sepolia frontend configuration is incomplete. Set ${missingKeys.join(", ")} in frontend/.env.local before selecting VITE_NETWORK=sepolia.`
-    );
-  }
-}
-
-requireSepoliaFrontendConfig();
-
 export const SEPOLIA_NETWORK = {
   chainId: 11155111,
   name: "Ethereum Sepolia",
-  rpcUrl: import.meta.env.VITE_SEPOLIA_RPC_URL,
+  rpcUrl: getSepoliaRpcUrl(),
   currency: "ETH",
 };
+
+export const SEPOLIA_TOKEN_HOLDER_ADDRESSES = (
+  import.meta.env.VITE_SEPOLIA_TOKEN_HOLDER_ADDRESSES || ""
+)
+  .split(",")
+  .map((address) => address.trim())
+  .filter(Boolean);
 
 export const NETWORKS = {
   local: LOCAL_NETWORK,
@@ -63,8 +92,16 @@ export const CONTRACT_ADDRESSES = {
       "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
   },
   11155111: {
-    ALUAssetRegistry: import.meta.env.VITE_SEPOLIA_ALU_ASSET_REGISTRY,
-    ALULogoToken: import.meta.env.VITE_SEPOLIA_ALU_LOGO_TOKEN,
+    ALUAssetRegistry: getSepoliaAddress(
+      "ALUAssetRegistry",
+      "VITE_SEPOLIA_ALU_ASSET_REGISTRY",
+      import.meta.env.VITE_SEPOLIA_ALU_ASSET_REGISTRY
+    ),
+    ALULogoToken: getSepoliaAddress(
+      "ALULogoToken",
+      "VITE_SEPOLIA_ALU_LOGO_TOKEN",
+      import.meta.env.VITE_SEPOLIA_ALU_LOGO_TOKEN
+    ),
   },
 };
 
