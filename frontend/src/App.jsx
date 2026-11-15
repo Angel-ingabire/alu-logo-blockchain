@@ -32,28 +32,6 @@ const unsupportedNetworkMessage = `Unsupported network. Please switch MetaMask t
 const TOKEN_EVENT_BATCH_SIZE = 10_000;
 const VERIFIED_TOKEN_DEPLOYMENT_BLOCK = Number.NaN;
 
-async function discoverAssetByHash(hash) {
-  const provider = new JsonRpcProvider(getNetworkConfig(ACTIVE_NETWORK.chainId).rpcUrl);
-  const registry = getRegistryContract(provider);
-  const logs = await registry.queryFilter(registry.filters.AssetRegistered());
-
-  for (const log of logs) {
-    const parsed = registry.interface.parseLog(log);
-    const tokenId = parsed.args[0];
-
-    try {
-      const asset = await registry.getAsset(tokenId);
-      if (asset.contentHash.toLowerCase() === hash.toLowerCase()) {
-        return { tokenId, asset };
-      }
-    } catch {
-      // Skip missing asset entries while scanning the registry.
-    }
-  }
-
-  return null;
-}
-
 async function getTransferLogsInBatches(tokenContract, startBlock, endBlock) {
   if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock) || startBlock > endBlock) {
     return [];
@@ -424,24 +402,15 @@ export default function App() {
       setVerifyResult(null);
 
       const normalizedHash = normalizeHash(verifyHash || generatedHash || "");
-      const discovered = await discoverAssetByHash(normalizedHash);
-
-      if (!discovered) {
-        setVerifyResult({
-          verified: false,
-          message: "Warning: This logo does not match the registered ALU logo.",
-          asset: null,
-        });
-        return;
-      }
-
       const registry = getRegistryContract(new JsonRpcProvider(getNetworkConfig(ACTIVE_NETWORK.chainId).rpcUrl));
-      const [isAuthentic] = await registry.verifyLogoIntegrity(discovered.tokenId, normalizedHash);
+      const isRegistered = await registry.registeredHashes(normalizedHash);
 
       setVerifyResult({
-        verified: Boolean(isAuthentic),
-        message: isAuthentic ? "Logo Verified: This is the authentic ALU logo." : "Warning: This logo does not match the registered ALU logo.",
-        asset: discovered.asset,
+        verified: Boolean(isRegistered),
+        message: isRegistered
+          ? "This SHA-256 hash is registered on the ALU Asset Registry."
+          : "This SHA-256 hash is not registered on the ALU Asset Registry.",
+        asset: null,
       });
     } catch (error) {
       setVerifyResult({

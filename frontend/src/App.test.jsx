@@ -21,9 +21,8 @@ const mockTokenContract = {
 const mockRegistryContract = {
   queryFilter: vi.fn(),
   filters: { AssetRegistered: vi.fn() },
-  interface: { parseLog: vi.fn() },
-  getAsset: vi.fn(),
-  verifyLogoIntegrity: vi.fn(),
+  registeredHashes: vi.fn(),
+  registerAsset: vi.fn(),
 };
 
 vi.mock("ethers", async () => {
@@ -38,19 +37,7 @@ vi.mock("ethers", async () => {
       }),
       getNetwork: vi.fn().mockResolvedValue({ chainId: 31337n, name: "Hardhat Local" }),
     })),
-    JsonRpcProvider: vi.fn().mockImplementation(() => ({
-      queryFilter: vi.fn().mockResolvedValue([{ data: "0x1", topics: ["0x1"] }]),
-      interface: { parseLog: vi.fn().mockReturnValue({ args: [1n] }) },
-      filters: { AssetRegistered: vi.fn() },
-      getAsset: vi.fn().mockResolvedValue({
-        assetName: "ALU Official Logo",
-        fileType: "PNG",
-        contentHash: MOCK_HASH,
-        registeredBy: MOCK_OWNER,
-        registeredAt: 1710000000n,
-      }),
-      verifyLogoIntegrity: vi.fn().mockResolvedValue([true, "Logo is authentic."]),
-    })),
+    JsonRpcProvider: vi.fn().mockImplementation(() => ({})),
   };
 });
 
@@ -103,16 +90,7 @@ describe("ALU dApp frontend requirements", () => {
     ]);
     mockTokenContract.distributeShares.mockResolvedValue({ wait: async () => ({}) });
 
-    mockRegistryContract.queryFilter.mockResolvedValue([{ data: "0x1", topics: ["0x1"] }]);
-    mockRegistryContract.interface.parseLog.mockReturnValue({ args: [1n] });
-    mockRegistryContract.getAsset.mockResolvedValue({
-      assetName: "ALU Official Logo",
-      fileType: "PNG",
-      contentHash: MOCK_HASH,
-      registeredBy: MOCK_OWNER,
-      registeredAt: 1710000000n,
-    });
-    mockRegistryContract.verifyLogoIntegrity.mockResolvedValue([true, "Logo is authentic."]);
+    mockRegistryContract.registeredHashes.mockResolvedValue(true);
   });
 
   it("renders the total ALUT supply for the connected wallet", async () => {
@@ -154,32 +132,53 @@ describe("ALU dApp frontend requirements", () => {
     });
   });
 
-  it("successfully verifies the authentic ALU logo using a matching hash", async () => {
+  it("verifies an uploaded image hash as registered without a wallet or transaction", async () => {
+    window.ethereum = undefined;
     render(<App />);
 
     fireEvent.click(screen.getAllByRole("button", { name: /verify logo/i })[0]);
 
-    const hashInput = screen.getByPlaceholderText("0x...");
-    fireEvent.change(hashInput, { target: { value: MOCK_HASH } });
+    const fileInput = document.querySelector('input[type="file"]');
+    const file = new File(["ALU logo content"], "alu-logo.png", { type: "image/png" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("0x...")).toHaveValue(MOCK_HASH);
+    });
+
     fireEvent.click(screen.getAllByRole("button", { name: /verify logo/i })[1]);
 
     await waitFor(() => {
-      expect(screen.getByText(/Logo Verified: This is the authentic ALU logo\./i)).toBeInTheDocument();
+      expect(screen.getByText("This SHA-256 hash is registered on the ALU Asset Registry.")).toBeInTheDocument();
     });
+
+    expect(mockRegistryContract.registeredHashes).toHaveBeenCalledWith(MOCK_HASH);
+    expect(mockRegistryContract.queryFilter).not.toHaveBeenCalled();
+    expect(mockRegistryContract.registerAsset).not.toHaveBeenCalled();
+    expect(mockTokenContract.distributeShares).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /connect wallet/i })).toBeInTheDocument();
   });
 
-  it("rejects a missing or mismatched logo hash during verification", async () => {
+  it("reports a directly entered hash as unregistered without a wallet or transaction", async () => {
+    window.ethereum = undefined;
     render(<App />);
 
     fireEvent.click(screen.getAllByRole("button", { name: /verify logo/i })[0]);
 
-    mockRegistryContract.verifyLogoIntegrity.mockResolvedValue([false, "Warning: logo does not match."]);
-    fireEvent.change(screen.getByPlaceholderText("0x..."), { target: { value: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" } });
+    const unregisteredHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+    mockRegistryContract.registeredHashes.mockResolvedValue(false);
+    fireEvent.change(screen.getByPlaceholderText("0x..."), { target: { value: unregisteredHash } });
     fireEvent.click(screen.getAllByRole("button", { name: /verify logo/i })[1]);
 
     await waitFor(() => {
-      expect(screen.getByText(/This logo does not match the registered ALU logo\./i)).toBeInTheDocument();
+      expect(screen.getByText("This SHA-256 hash is not registered on the ALU Asset Registry.")).toBeInTheDocument();
     });
+
+    expect(mockRegistryContract.registeredHashes).toHaveBeenCalledWith(unregisteredHash);
+    expect(mockRegistryContract.queryFilter).not.toHaveBeenCalled();
+    expect(mockRegistryContract.registerAsset).not.toHaveBeenCalled();
+    expect(mockTokenContract.distributeShares).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /connect wallet/i })).toBeInTheDocument();
   });
 
   it("refreshes the connected wallet balance after a token distribution without a full historical holder scan", async () => {
