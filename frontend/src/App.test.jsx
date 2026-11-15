@@ -51,8 +51,6 @@ vi.mock("ethers", async () => {
       }),
       verifyLogoIntegrity: vi.fn().mockResolvedValue([true, "Logo is authentic."]),
     })),
-    formatUnits: vi.fn((value) => value.toString()),
-    parseUnits: vi.fn((value) => BigInt(value)),
   };
 });
 
@@ -127,6 +125,20 @@ describe("ALU dApp frontend requirements", () => {
     });
   });
 
+  it("skips historical Transfer log scans when no verified deployment block is available", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect wallet/i }));
+    fireEvent.click(screen.getByRole("button", { name: /token dashboard/i }));
+
+    await waitFor(() => {
+      expect(mockTokenContract.balanceOf).toHaveBeenCalledWith(MOCK_OWNER.toLowerCase());
+      expect(screen.getByText(/Complete holder list unavailable:/i)).toBeInTheDocument();
+    });
+
+    expect(mockTokenContract.queryFilter).not.toHaveBeenCalled();
+  });
+
   it("hashes a selected file and shows the browser SHA-256 digest", async () => {
     render(<App />);
 
@@ -170,7 +182,7 @@ describe("ALU dApp frontend requirements", () => {
     });
   });
 
-  it("refreshes the connected wallet balance after a token distribution", async () => {
+  it("refreshes the connected wallet balance after a token distribution without a full historical holder scan", async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /connect wallet/i }));
@@ -182,6 +194,7 @@ describe("ALU dApp frontend requirements", () => {
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText("0x...")).toBeInTheDocument();
+      expect(screen.getByText(/Complete holder list unavailable:/i)).toBeInTheDocument();
     });
 
     mockTokenContract.balanceOf.mockImplementation(async (address) => {
@@ -202,6 +215,60 @@ describe("ALU dApp frontend requirements", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/Success: 250000 ALUT was distributed/i).length).toBeGreaterThan(0);
+      expect(mockTokenContract.balanceOf).toHaveBeenCalledWith(MOCK_RECIPIENT.toLowerCase());
     });
+  });
+
+  it("rejects invalid recipients and non-positive amounts before sending", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect wallet/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /disconnect/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /token dashboard/i }));
+
+    const recipientInput = screen.getAllByPlaceholderText("0x...")[0];
+    const amountInput = screen.getByPlaceholderText("250000");
+    fireEvent.change(recipientInput, { target: { value: "not-an-address" } });
+    fireEvent.change(amountInput, { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: /distribute shares/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Enter a valid recipient wallet address.")).toBeInTheDocument();
+    });
+    expect(mockTokenContract.distributeShares).not.toHaveBeenCalled();
+
+    fireEvent.change(recipientInput, { target: { value: MOCK_RECIPIENT } });
+    fireEvent.change(amountInput, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: /distribute shares/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("The amount must be greater than zero.")).toBeInTheDocument();
+    });
+    expect(mockTokenContract.distributeShares).not.toHaveBeenCalled();
+  });
+
+  it("rejects a distribution larger than the owner's balance", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect wallet/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /disconnect/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /token dashboard/i }));
+
+    fireEvent.change(screen.getAllByPlaceholderText("0x...")[0], {
+      target: { value: MOCK_RECIPIENT },
+    });
+    fireEvent.change(screen.getByPlaceholderText("250000"), {
+      target: { value: "1000001" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /distribute shares/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Insufficient ALUT balance for this distribution.")).toBeInTheDocument();
+    });
+    expect(mockTokenContract.distributeShares).not.toHaveBeenCalled();
   });
 });

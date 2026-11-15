@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BrowserProvider, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
+import { BrowserProvider, JsonRpcProvider, formatUnits, isAddress, parseUnits } from "ethers";
 import {
   AlertCircle,
   ArrowRight,
@@ -29,6 +29,8 @@ const navItems = [
 ];
 
 const unsupportedNetworkMessage = `Unsupported network. Please switch MetaMask to ${ACTIVE_NETWORK.name} (Chain ID ${ACTIVE_NETWORK.chainId}).`;
+const TOKEN_EVENT_BATCH_SIZE = 10_000;
+const VERIFIED_TOKEN_DEPLOYMENT_BLOCK = Number.NaN;
 
 async function discoverAssetByHash(hash) {
   const provider = new JsonRpcProvider(getNetworkConfig(ACTIVE_NETWORK.chainId).rpcUrl);
@@ -52,8 +54,50 @@ async function discoverAssetByHash(hash) {
   return null;
 }
 
+async function getTransferLogsInBatches(tokenContract, startBlock, endBlock) {
+  if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock) || startBlock > endBlock) {
+    return [];
+  }
+
+  const logs = [];
+  const seen = new Set();
+  let fromBlock = startBlock;
+
+  while (fromBlock <= endBlock) {
+    const toBlock = Math.min(fromBlock + TOKEN_EVENT_BATCH_SIZE - 1, endBlock);
+    try {
+      const batchLogs = await tokenContract.queryFilter(tokenContract.filters.Transfer(), fromBlock, toBlock);
+
+      for (const log of batchLogs) {
+        const logKey = `${log.transactionHash ?? ""}:${log.logIndex ?? "0"}`;
+        if (seen.has(logKey)) {
+          continue;
+        }
+        seen.add(logKey);
+        logs.push(log);
+      }
+    } catch (error) {
+      throw new Error(`Unable to load Transfer events for blocks ${fromBlock}-${toBlock}: ${error.message || "RPC request failed."}`);
+    }
+
+    fromBlock = toBlock + 1;
+  }
+
+  return logs;
+}
+
 async function loadHolderEntries(tokenContract) {
-  const transferLogs = await tokenContract.queryFilter(tokenContract.filters.Transfer());
+  if (!Number.isFinite(VERIFIED_TOKEN_DEPLOYMENT_BLOCK)) {
+    return null;
+  }
+
+  const provider = tokenContract?.runner?.provider ?? tokenContract?.provider;
+  const latestBlock = provider ? Number(await provider.getBlockNumber()) : Number.NaN;
+  if (!Number.isFinite(latestBlock)) {
+    throw new Error("Unable to determine the latest block height for the holder history scan.");
+  }
+
+  const transferLogs = await getTransferLogsInBatches(tokenContract, VERIFIED_TOKEN_DEPLOYMENT_BLOCK, latestBlock);
   const seen = new Set();
 
   for (const log of transferLogs) {
@@ -84,12 +128,12 @@ async function loadHolderEntries(tokenContract) {
   }
 
   const illustrative = [
-    { address: "Illustrative example: ALU treasury wallet", balance: "250000", percentage: "25", isIllustrative: true },
-    { address: "Illustrative example: faculty wallet", balance: "125000", percentage: "12.5", isIllustrative: true },
-    { address: "Illustrative example: student wallet", balance: "50000", percentage: "5", isIllustrative: true },
+    { address: "0x1000000000000000000000000000000000000001", balance: "250000", percentage: "25", isIllustrative: true },
+    { address: "0x1000000000000000000000000000000000000002", balance: "125000", percentage: "12", isIllustrative: true },
+    { address: "0x1000000000000000000000000000000000000003", balance: "50000", percentage: "5", isIllustrative: true },
   ];
 
-  return [...entries, ...illustrative].slice(0, 3);
+  return [...entries, ...illustrative];
 }
 
 export default function App() {
@@ -104,6 +148,7 @@ export default function App() {
   const [ownershipPercentage, setOwnershipPercentage] = useState("0");
   const [tokenOwner, setTokenOwner] = useState("");
   const [holderEntries, setHolderEntries] = useState([]);
+  const [holderWarning, setHolderWarning] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [assetName, setAssetName] = useState("ALU Official Logo");
@@ -111,7 +156,6 @@ export default function App() {
   const [generatedHash, setGeneratedHash] = useState("");
   const [registeringStatus, setRegisteringStatus] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
-  const [verifyTokenId, setVerifyTokenId] = useState("1");
   const [verifyHash, setVerifyHash] = useState("");
   const [verifyResult, setVerifyResult] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -216,9 +260,19 @@ export default function App() {
       setTokenSupply(formatUnits(supply, 18));
       setTokenOwner(owner);
       setOwnershipPercentage(percentage.toString());
-      setHolderEntries(await loadHolderEntries(tokenContract));
+
+      setHolderWarning("");
+      const holderList = await loadHolderEntries(tokenContract);
+      if (holderList === null) {
+        setHolderEntries([]);
+        setHolderWarning("Complete holder list unavailable: no verified deployment block was recorded for ALULogoToken, so the dashboard skips the historical Transfer log scan from block zero. The connected wallet balance and ownership values still load normally.");
+      } else {
+        setHolderEntries(holderList);
+      }
     } catch (error) {
-      setConnectionError(error.message || "Unable to refresh wallet state.");
+      setHolderEntries([]);
+      setHolderWarning(`Complete holder list unavailable: ${error.message || "historical Transfer log scanning failed."}`);
+      setConnectionError("");
     }
   }
 
@@ -255,6 +309,7 @@ export default function App() {
     setOwnershipPercentage("0");
     setTokenOwner("");
     setHolderEntries([]);
+    setHolderWarning("");
     setConnectionError("");
     setNetworkName("Wallet disconnected");
   }
@@ -350,7 +405,6 @@ export default function App() {
       const newTokenId = parsedLog?.args?.[0]?.toString?.() ?? "unknown";
 
       setRegisteringStatus(`Asset registered successfully. Token ID: ${newTokenId}`);
-      setVerifyTokenId(newTokenId);
     } catch (error) {
       if (String(error.message || error).includes("already registered")) {
         setRegisteringStatus("This logo hash has already been registered. Please verify the asset before submitting a duplicate.");
@@ -408,8 +462,29 @@ export default function App() {
       return;
     }
 
-    if (!distributionRecipient || !distributionAmount) {
+    const recipient = distributionRecipient.trim();
+    const amount = distributionAmount.trim();
+
+    if (!recipient || !amount) {
       setDistributionStatus("Recipient address and amount are required.");
+      return;
+    }
+
+    if (!isAddress(recipient)) {
+      setDistributionStatus("Enter a valid recipient wallet address.");
+      return;
+    }
+
+    let amountInWei;
+    try {
+      amountInWei = parseUnits(amount, 18);
+    } catch {
+      setDistributionStatus("Enter a valid ALUT amount with no more than 18 decimal places.");
+      return;
+    }
+
+    if (amountInWei <= 0n) {
+      setDistributionStatus("The amount must be greater than zero.");
       return;
     }
 
@@ -420,23 +495,37 @@ export default function App() {
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const token = getTokenContract(signer);
-      const amountInWei = parseUnits(distributionAmount.trim(), 18);
-      const transaction = await token.distributeShares(distributionRecipient.trim(), amountInWei);
+      const ownerBalance = await token.balanceOf(walletAddress);
+      if (amountInWei > ownerBalance) {
+        setDistributionStatus("Insufficient ALUT balance for this distribution.");
+        return;
+      }
+
+      const transaction = await token.distributeShares(recipient, amountInWei);
       await transaction.wait();
 
-      const [balance, owner, percentage] = await Promise.all([
+      const [balance, owner, percentage, recipientBalance] = await Promise.all([
         token.balanceOf(walletAddress),
         token.owner(),
         token.ownershipPercentage(walletAddress),
+        token.balanceOf(recipient),
       ]);
 
       setTokenBalance(formatUnits(balance, 18));
       setTokenOwner(owner);
       setOwnershipPercentage(percentage.toString());
-      setDistributionStatus(`Success: ${distributionAmount} ALUT was distributed to ${formatAddress(distributionRecipient.trim())}.`);
+      setDistributionStatus(`Success: ${amount} ALUT was distributed to ${formatAddress(recipient)}. Recipient balance: ${formatUnits(recipientBalance, 18)} ALUT.`);
       setDistributionRecipient("");
       setDistributionAmount("");
-      setHolderEntries(await loadHolderEntries(token));
+
+      const holderList = await loadHolderEntries(token);
+      if (holderList === null) {
+        setHolderEntries([]);
+        setHolderWarning("Complete holder list unavailable: no verified deployment block was recorded for ALULogoToken, so the historical Transfer log scan is skipped. The connected wallet balance and ownership values still update normally.");
+      } else {
+        setHolderEntries(holderList);
+        setHolderWarning("");
+      }
     } catch (error) {
       setDistributionStatus(error.message || "Token distribution failed.");
     } finally {
@@ -740,17 +829,7 @@ export default function App() {
 
                   <form onSubmit={handleVerify} className="space-y-5">
                     <div className="grid gap-5 md:grid-cols-[180px_1fr]">
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-slate-700">Token ID (optional)</label>
-                        <input
-                          value={verifyTokenId}
-                          onChange={(event) => setVerifyTokenId(event.target.value)}
-                          className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                          placeholder="Auto-discovery"
-                        />
-                      </div>
-
-                      <div className="space-y-3">
+                      <div className="space-y-3 md:col-span-2">
                         <label className="block text-sm font-medium text-slate-700">Paste SHA-256 hash</label>
                         <input
                           value={verifyHash}
@@ -774,16 +853,22 @@ export default function App() {
                           onChange={async (event) => {
                             const file = event.target.files?.[0];
                             if (!file) return;
-                            if (file.size === 0) {
-                              setVerifyResult({ verified: false, message: "The selected image is empty. Please choose a file with content.", asset: null });
-                              return;
+                            try {
+                              if (file.size === 0) {
+                                throw new Error("The selected image is empty. Please choose a file with content.");
+                              }
+                              if (!file.type.startsWith("image/")) {
+                                throw new Error("Unsupported file format. Please upload an image file such as PNG, JPG or WEBP.");
+                              }
+                              setVerifyHash(await computeFileHash(file));
+                              setVerifyResult(null);
+                            } catch (error) {
+                              setVerifyResult({
+                                verified: false,
+                                message: error.message || "Unable to hash the selected image.",
+                                asset: null,
+                              });
                             }
-                            if (!file.type.startsWith("image/")) {
-                              setVerifyResult({ verified: false, message: "Unsupported file format. Please upload an image file such as PNG, JPG or WEBP.", asset: null });
-                              return;
-                            }
-                            const hash = await computeFileHash(file);
-                            setVerifyHash(hash);
                           }}
                           className="hidden"
                         />
@@ -871,7 +956,7 @@ export default function App() {
                   <div className="space-y-3">
                     {holderEntries.length === 0 ? (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                        No holder data loaded yet. Connect a wallet to view the current ownership distribution.
+                        {holderWarning || "No holder data loaded yet. Connect a wallet to view the current ownership distribution."}
                       </div>
                     ) : (
                       holderEntries.map((entry) => (
@@ -939,7 +1024,16 @@ export default function App() {
                       </div>
 
                       {distributionStatus && (
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                        <div
+                          role="status"
+                          className={`rounded-xl border px-3 py-2 text-sm ${
+                            distributionStatus.startsWith("Success:")
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : distributionStatus === "Sending ALUT tokens..."
+                                ? "border-blue-200 bg-blue-50 text-blue-800"
+                                : "border-red-200 bg-red-50 text-red-700"
+                          }`}
+                        >
                           {distributionStatus}
                         </div>
                       )}
